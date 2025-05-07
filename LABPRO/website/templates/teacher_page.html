@@ -1,0 +1,146 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <title>Öğretmen Paneli</title>
+
+  <!-- CSRF -->
+  <meta name="csrf-token" content="{{ csrf_token }}">
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    .table { width:100%; border-collapse:collapse; }
+    .table th, .table td { border:1px solid #dee2e6; padding:.6rem; text-align:center; }
+  </style>
+</head>
+<body>
+<div class="container mt-4">
+
+  <!-- Hoş geldiniz -->
+  <h5 class="mb-3">Hoş geldiniz, <strong>{{ username }}</strong>!</h5>
+
+  <!-- BLM Programı -->
+  <h3>BLM Programı</h3>
+  {{ blm_html|safe }}
+
+  <!-- YZM Programı -->
+  <h3 class="mt-5">YZM Programı</h3>
+  {{ yzm_html|safe }}
+
+  <hr class="my-4">
+
+  <!-- Meşgul Saat Ekle -->
+  <h3>Meşgul Saat Ekle</h3>
+  <div class="row g-3 mb-4">
+    <input type="hidden" id="teacherId" value="{{ teacher_id }}">
+    <div class="col-md-5">
+      <label class="form-label">Gün</label>
+      <select id="daySel" class="form-select">
+        <option>Pazartesi</option>
+        <option>Salı</option>
+        <option>Çarşamba</option>
+        <option>Perşembe</option>
+        <option>Cuma</option>
+      </select>
+    </div>
+    <div class="col-md-5">
+      <label class="form-label">Saat Aralığı</label>
+      <select id="slotSel" class="form-select">
+        <option>09:00-10:00</option>
+        <option>10:00-11:00</option>
+        <option>11:00-12:00</option>
+        <option>12:00-13:00</option>
+        <option>13:00-14:00</option>
+        <option>14:00-15:00</option>
+        <option>15:00-16:00</option>
+        <option>16:00-17:00</option>
+        <option>17:00-18:00</option>
+        <option>19:00-21:00</option>
+      </select>
+    </div>
+    <div class="col-md-2 d-grid">
+      <button id="saveBtn" class="btn btn-primary mt-auto">Kaydet</button>
+    </div>
+  </div>
+
+  <!-- Meşgul Saat Listesi -->
+  <h4>Meşgul Saatleriniz</h4>
+  <ul class="list-group" id="busyList">
+    <li class="list-group-item">Yükleniyor…</li>
+  </ul>
+
+  <!-- Çıkış Butonu -->
+  <div class="text-end mt-4">
+    <a href="{% url 'logout' %}" class="btn btn-danger">Çıkış</a>
+  </div>
+
+</div>
+
+<!-- JS -->
+<script>
+document.addEventListener('DOMContentLoaded', ()=>{
+  const csrf  = document.querySelector('meta[name="csrf-token"]').content;
+  const apiL  = '{% url "api_list_busy_times" %}';
+  const apiS  = '{% url "api_save_busy_time" %}';
+  const apiD  = '{% url "api_delete_busy_time" %}';
+  const tid   = document.getElementById('teacherId').value;
+  const ul    = document.getElementById('busyList');
+
+  // Meşgul saatleri yükle
+  const loadBusy = async ()=>{
+    const j = await fetch(apiL, { credentials:'same-origin' }).then(r=>r.json());
+    ul.innerHTML = '';
+    if(!j.busy_times.length){
+      ul.innerHTML = '<li class="list-group-item">Henüz kayıt yok.</li>';
+      return;
+    }
+    j.busy_times.forEach(b=>{
+      const li  = document.createElement('li');
+      li.className = 'list-group-item d-flex justify-content-between align-items-center';
+      li.textContent = `${b.day}: ${b.start}-${b.end}`;
+
+      const del = document.createElement('button');
+      del.className = 'btn btn-sm btn-danger';
+      del.textContent = 'Sil';
+      del.onclick = ()=>deleteBusy(b.day, b.start, b.end);
+      li.appendChild(del);
+      ul.appendChild(li);
+    });
+  };
+  loadBusy();
+
+  // Kaydet
+  document.getElementById('saveBtn').addEventListener('click', async ()=>{
+    const day  = document.getElementById('daySel').value;
+    const slot = document.getElementById('slotSel').value;
+    const [start, end] = slot.split('-');
+    const res = await fetch(apiS, {
+      method:'POST',
+      credentials:'same-origin',
+      headers:{ 'Content-Type':'application/json','X-CSRFToken':csrf },
+      body: JSON.stringify({ teacher_id:tid, day_of_week:day, time_slot_start:start, time_slot_end:end })
+    }).then(r=>r.json());
+    if(res.status==='success') loadBusy();
+    else alert(res.message||'Hata oluştu!');
+  });
+
+  // Sil
+  async function deleteBusy(day, start, end){
+    if(!confirm(`${day} ${start}-${end} kaydı silinsin mi?`)) return;
+    const res = await fetch(apiD, {
+      method:'POST',
+      credentials:'same-origin',
+      headers:{ 'Content-Type':'application/json','X-CSRFToken':csrf },
+      body: JSON.stringify({ teacher_id:tid, day_of_week:day, time_slot_start:start, time_slot_end:end })
+    }).then(r=>r.json());
+    if(res.status==='success') loadBusy();
+    else alert(res.message||'Silme hatası!');
+  }
+});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Ders Programı Giriş</title>
+    <style>
+        body{
+            font-family:Arial, sans-serif;
+            background:linear-gradient(to right,#6a11cb,#2575fc);
+            height:100vh;margin:0;display:flex;align-items:center;justify-content:center;
+        }
+        .login-container{
+            width:350px;background:#fff;padding:40px 30px;border-radius:15px;
+            box-shadow:0 8px 16px rgba(0,0,0,.2);
+        }
+        h1{margin:0 0 20px;text-align:center;color:#333;font-size:24px}
+        label{font-weight:600;display:block;margin-bottom:5px;color:#555}
+        input,select{
+            width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;
+            margin-bottom:20px;box-sizing:border-box;
+        }
+        button{
+            width:100%;padding:12px;border:none;border-radius:8px;
+            background:#2575fc;color:#fff;font-size:16px;cursor:pointer;
+            transition:background .3s;
+        }
+        button:hover{background:#6a11cb}
+    </style>
+</head>
+<body>
+
+<div class="login-container">
+    <h1>Ders Programı Giriş</h1>
+
+    <form method="POST">
+        {% csrf_token %}
+        <label for="username">Kullanıcı Adı</label>
+        <input  id="username" name="username" type="text" required
+                value="{{ username|default:'' }}">
+
+        <label for="password">Şifre</label>
+        <input  id="password" name="password" type="password" required>
+
+        <label for="user_type">Kullanıcı Türü</label>
+        <select id="user_type" name="user_type" required>
+            <option value="öğrenci" {% if user_type == 'öğrenci' %}selected{% endif %}>Öğrenci</option>
+            <option value="öğretim görevlisi" {% if user_type == 'öğretim görevlisi' %}selected{% endif %}>Öğretim Görevlisi</option>
+            <option value="admin" {% if user_type == 'admin' %}selected{% endif %}>Admin</option>
+        </select>
+
+        <button type="submit">Giriş Yap</button>
+    </form>
+</div>
+
+{# Sunucu hata mesajı göndermişse ekranda alert göster #}
+{% if error_message %}
+<script>
+    alert("Hatalı şifre!");
+</script>
+{% endif %}
+
+</body>
+</html>

@@ -1,0 +1,414 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <title>Admin Paneli | Ders Programı</title>
+
+  <!-- AJAX için CSRF token -->
+  <meta name="csrf-token" content="{{ csrf_token }}">
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { min-height:100vh; display:flex; background:#f5f7fb; }
+    .sidebar { width:240px; background:#222c3c; color:#fff; flex-shrink:0; display:flex; flex-direction:column; padding:30px 0; }
+    .sidebar a { color:#adb8cf; padding:12px 30px; text-decoration:none; cursor:pointer; }
+    .sidebar a:hover, .sidebar a.active { background:#1b2432; color:#fff; }
+    .content { flex:1; padding:40px; }
+    .d-none { display:none !important; }
+    td textarea { width:100%; height:3rem; resize:vertical; }
+  </style>
+</head>
+<body>
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <h4 class="text-center mb-4">Yönetim</h4>
+    <a data-target="users" class="active">Kullanıcılar</a>
+    <a data-target="courses">Dersler</a>
+    <a data-target="classrooms">Derslikler</a>
+    <a data-target="schedule">Ders Programı Oluştur</a>
+    <a href="{% url 'logout' %}" class="mt-auto">Çıkış</a>
+  </nav>
+
+  <main class="content">
+    <!-- KULLANICILAR -->
+    <section id="users">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Kullanıcılar</h2>
+        <div class="d-flex">
+          <select id="userFilter" class="form-select w-auto me-2">
+            <option value="">Tümü</option>
+            <option value="admin">Admin</option>
+            <option value="öğretim görevlisi">Öğretim Görevlisi</option>
+            <option value="öğrenci">Öğrenci</option>
+          </select>
+          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#userModal">
+            + Kullanıcı Ekle
+          </button>
+        </div>
+      </div>
+      <table class="table table-striped table-hover">
+        <thead>
+          <tr>
+            <th>User ID</th><th>Kullanıcı ID</th><th>E-posta</th><th>Rol</th><th>İsim Soyisim</th><th>Password</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="userTable"></tbody>
+      </table>
+    </section>
+    <hr class="my-5 d-none">
+
+    <!-- DERSLER -->
+    <section id="courses" class="d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Dersler</h2>
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#courseModal">
+          + Ders Ekle
+        </button>
+      </div>
+      <table class="table table-striped table-hover">
+        <thead>
+          <tr>
+            <th>Kodu</th><th>Bölüm</th><th>Adı</th><th>Yönetici</th>
+            <th>Öğrenci</th><th>Saat</th><th>Yarıyıl</th><th>Tür</th><th>Statü</th><th>Eşzamanlık Kodu</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="courseTable"></tbody>
+      </table>
+    </section>
+    <hr class="my-5 d-none">
+
+    <!-- DERSLİKLER -->
+    <section id="classrooms" class="d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Derslikler</h2>
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#classroomModal">
+          + Derslik Ekle
+        </button>
+      </div>
+      <table class="table table-striped table-hover">
+        <thead>
+          <tr><th>Kodu</th><th>Kapasite</th><th>Durum</th><th></th></tr>
+        </thead>
+        <tbody id="classroomTable"></tbody>
+      </table>
+    </section>
+    <hr class="my-5 d-none">
+
+    <!-- Ders Programı Oluştur -->
+    <section id="schedule" class="d-none">
+      <div class="mb-4">
+        <input id="scheduleID" class="form-control w-25 d-inline-block" placeholder="Program ID">
+        <button class="btn btn-primary" id="createScheduleBtn">Oluştur</button>
+      </div>
+      <div id="scheduleList"></div>
+    </section>
+  </main>
+
+  <!-- MODAL: Kullanıcı Ekle -->
+  <div class="modal fade" id="userModal" tabindex="-1">
+    <div class="modal-dialog">
+      <form class="modal-content" id="userForm">
+        <div class="modal-header"><h5 class="modal-title">Kullanıcı Ekle</h5></div>
+        <div class="modal-body">
+          <input type="hidden" name="userid" id="uuidField">
+          <input class="form-control mb-3" name="username" placeholder="Kullanıcı ID" required>
+          <input class="form-control mb-3" name="email" type="email" placeholder="E-posta" required>
+          <select id="roleSelect" class="form-select mb-3" name="role" required>
+            <option value="admin">Admin</option>
+            <option value="öğretim görevlisi">Öğretim Görevlisi</option>
+            <option value="öğrenci">Öğrenci</option>
+          </select>
+          <input class="form-control mb-3 d-none" id="classField"
+                 name="st_class" type="number" min="1" max="4"
+                 placeholder="Öğrenci Sınıfı (1-4)">
+          <input class="form-control mb-3" name="fullname" placeholder="İsim Soyisim" required>
+          <input class="form-control mb-3" name="password" type="text" placeholder="Password" required>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">İptal</button>
+          <button class="btn btn-primary" type="submit">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Ders Ekle -->
+  <div class="modal fade" id="courseModal" tabindex="-1">
+    <div class="modal-dialog">
+      <form class="modal-content" id="courseForm">
+        <div class="modal-header"><h5 class="modal-title">Ders Ekle</h5></div>
+        <div class="modal-body">
+          <input class="form-control mb-3" name="code" placeholder="Ders Kodu" required>
+          <select class="form-select mb-3" name="dept" required>
+            <option value="">Bölüm seçiniz…</option>
+            <option value="BLM">BLM</option>
+            <option value="YZM">YZM</option>
+            <option value="FAKÜLTE(ORTAK)">FAKÜLTE (ORTAK)</option>
+          </select>
+          <input class="form-control mb-3" name="name" placeholder="Ders Adı" required>
+          <select id="managerSelect" class="form-select mb-3" name="manager" required>
+            <option value="">Yönetici seçiniz…</option>
+          </select>
+          <input class="form-control mb-3" name="students" type="number" min="1" placeholder="Öğrenci Sayısı" required>
+          <input class="form-control mb-3" name="hours" type="number" min="1" placeholder="Haftalık Saat" required>
+          <select class="form-select mb-3" name="semester" required>
+            {% for i in "12345678" %}<option value="{{ i }}">{{ i }}</option>{% endfor %}
+          </select>
+          <select class="form-select mb-3" name="ctype" required>
+            <option value="Zorunlu">Zorunlu</option>
+            <option value="Seçmeli">Seçmeli</option>
+          </select>
+          <select class="form-select" name="status" required>
+            <option value="ONLINE">ONLINE</option>
+            <option value="YÜZ YÜZE">YÜZ YÜZE</option>
+          </select>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">İptal</button>
+          <button class="btn btn-success" type="submit">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Derslik Ekle -->
+  <div class="modal fade" id="classroomModal" tabindex="-1">
+    <div class="modal-dialog">
+      <form class="modal-content" id="classroomForm">
+        <div class="modal-header"><h5 class="modal-title">Derslik Ekle</h5></div>
+        <div class="modal-body">
+          <input class="form-control mb-3" name="code" placeholder="Derslik Kodu" required>
+          <input class="form-control mb-3" name="capacity" type="number" min="1" placeholder="Kapasite" required>
+          <select class="form-select" name="status" required>
+            <option value="LAB">LAB</option>
+            <option value="NORMAL">NORMAL</option>
+          </select>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">İptal</button>
+          <button class="btn btn-success" type="submit">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+    // Sekme geçişi
+    function showTab(tabId) {
+      document.querySelectorAll('.sidebar a[data-target]').forEach(a => {
+        a.classList.toggle('active', a.dataset.target === tabId);
+      });
+      ['users','courses','classrooms','schedule'].forEach(id => {
+        document.getElementById(id).classList.toggle('d-none', id !== tabId);
+      });
+    }
+
+    // Dinamik Öğrenci Sınıfı Alanı
+    const roleSel = document.getElementById("roleSelect");
+    const classInp = document.getElementById("classField");
+    roleSel.addEventListener("change", () => {
+      const isStudent = roleSel.value === "öğrenci";
+      classInp.classList.toggle("d-none", !isStudent);
+      classInp.required = isStudent;
+    });
+
+    // Modal reset
+    document.getElementById("userModal").addEventListener("hidden.bs.modal", () => {
+      const f = document.getElementById("userForm");
+      f.reset();
+      classInp.classList.add("d-none");
+      classInp.required = false;
+    });
+
+    // --- CRUD & Scheduling Functions ---
+    async function loadUsers() {
+      const { users } = await (await fetch("{% url 'list_users' %}", { credentials:'same-origin' })).json();
+      const filter = document.getElementById('userFilter').value;
+      const tb = document.getElementById('userTable');
+      tb.innerHTML = '';
+      users.filter(u => !filter || u.role===filter)
+           .forEach(u => tb.insertAdjacentHTML('beforeend', `
+             <tr>
+               <td>${u.userid}</td><td>${u.username}</td><td>${u.email}</td>
+               <td>${u.role}</td><td>${u.fullname}</td><td>${u.password}</td>
+               <td><button class="btn btn-sm btn-danger" onclick="deleteUser('${u.userid}')">Sil</button></td>
+             </tr>
+           `));
+    }
+    async function deleteUser(uid){
+      if(!confirm("Bu kullanıcı silinsin mi?")) return;
+      const js = await (await fetch("{% url 'delete_user' %}", {
+        method:'POST', credentials:'same-origin',
+        headers:{'X-CSRFToken':csrfToken,'Content-Type':'application/x-www-form-urlencoded'},
+        body:new URLSearchParams({userid:uid})
+      })).json();
+      if(!js.ok){alert(js.msg||"Silme hatası");return;}
+      loadUsers();
+    }
+    document.getElementById('userFilter').addEventListener('change', loadUsers);
+
+    async function loadManagers(){
+      const { managers } = await (await fetch("{% url 'list_managers' %}", { credentials:'same-origin' })).json();
+      const sel = document.getElementById("managerSelect");
+      sel.innerHTML = '<option value="">Yönetici seçiniz…</option>';
+      managers.forEach(m=>sel.insertAdjacentHTML('beforeend',`<option value="${m.id}">${m.name}</option>`));
+    }
+    async function loadCourses(){
+      const { courses } = await (await fetch("{% url 'list_courses' %}", { credentials:'same-origin' })).json();
+      const tb = document.getElementById('courseTable');
+      tb.innerHTML='';
+      courses.forEach(c=> tb.insertAdjacentHTML('beforeend',`
+        <tr data-code="${c.code}" data-dept="${c.dept}">
+          <td>${c.code}</td><td>${c.dept}</td><td>${c.name}</td><td>${c.manager}</td>
+          <td>${c.students}</td><td>${c.hours}</td><td>${c.semester}</td><td>${c.ctype}</td><td>${c.status}</td>
+          <td><textarea class="form-control sync-code">${c.sync_code||''}</textarea></td>
+          <td><button class="btn btn-sm btn-danger" onclick="deleteCourse('${c.code}','${c.dept}')">Sil</button></td>
+        </tr>`));
+      document.querySelectorAll('.sync-code').forEach(tx=>tx.addEventListener('blur',async e=>{
+        const row=e.target.closest('tr'),code=row.dataset.code,dept=row.dataset.dept,val=e.target.value;
+        const js=await (await fetch("{% url 'update_sync_code' %}",{
+          method:'POST',credentials:'same-origin',
+          headers:{'X-CSRFToken':csrfToken,'Content-Type':'application/x-www-form-urlencoded'},
+          body:new URLSearchParams({code,dept,sync_code:val})
+        })).json();
+        if(!js.ok) alert(js.msg||'Güncelleme hatası');
+      }));
+    }
+    async function deleteCourse(code,dept){
+      if(!confirm("Bu ders silinsin mi?"))return;
+      const js=await (await fetch("{% url 'delete_course' %}",{
+        method:'POST',credentials:'same-origin',
+        headers:{'X-CSRFToken':csrfToken,'Content-Type':'application/x-www-form-urlencoded'},
+        body:new URLSearchParams({code,dept})
+      })).json();
+      if(!js.ok){alert(js.msg||"Silme hatası");return;}
+      loadCourses();
+    }
+
+    async function loadClassrooms(){
+      const { classrooms } = await (await fetch("{% url 'list_classrooms' %}", { credentials:'same-origin' })).json();
+      const tb = document.getElementById('classroomTable');
+      tb.innerHTML = '';
+      classrooms.forEach(r=> tb.insertAdjacentHTML('beforeend',`
+        <tr><td>${r.code}</td><td>${r.capacity}</td><td>${r.status}</td>
+            <td><button class="btn btn-sm btn-danger" onclick="deleteClassroom('${r.code}')">Sil</button></td></tr>`));
+    }
+    async function deleteClassroom(code){
+      if(!confirm("Bu derslik silinsin mi?"))return;
+      const js=await (await fetch("{% url 'delete_classroom' %}",{
+        method:'POST',credentials:'same-origin',
+        headers:{'X-CSRFToken':csrfToken,'Content-Type':'application/x-www-form-urlencoded'},
+        body:new URLSearchParams({code})
+      })).json();
+      if(!js.ok){alert(js.msg||"Silme hatası");return;}
+      loadClassrooms();
+    }
+
+    // Schedule API endpoints
+    const apiCreate = "{% url 'api_create_schedule' %}";
+    const apiList   = "{% url 'api_list_schedules' %}";
+    const apiDelete = "{% url 'api_delete_schedule' %}";
+
+    async function loadSchedules(){
+      const resp = await fetch(apiList,{credentials:'same-origin'});
+      const data = await resp.json();
+      if(data.status!=='success'){alert('Program listesi alınamadı');return;}
+      const container = document.getElementById('scheduleList');
+      container.innerHTML='';
+      data.schedules.forEach(s=>{
+        const div=document.createElement('div');
+        div.classList.add('mb-5');
+        div.innerHTML=`
+          <h4>Program ID: ${s.id}</h4>
+          ${s.html}
+          <button class="btn btn-sm btn-danger mt-2 delete-sched-btn" data-id="${s.id}">Sil</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+    document.addEventListener('click',async e=>{
+      if(e.target.classList.contains('delete-sched-btn')){
+        const id=e.target.dataset.id;
+        if(!confirm('Bu program silinsin mi?'))return;
+        const resp=await fetch(apiDelete,{
+          method:'POST',credentials:'same-origin',
+          headers:{'X-CSRFToken':csrfToken,'Content-Type':'application/json'},
+          body:JSON.stringify({schedule_id:id})
+        });
+        const data=await resp.json();
+        if(data.status!=='success'){alert(data.message||'Silme hatası');return;}
+        loadSchedules();
+      }
+    });
+
+    // Initialize on DOMContentLoaded
+    document.addEventListener('DOMContentLoaded',()=>{
+      document.querySelectorAll('.sidebar a[data-target]').forEach(a=>
+        a.addEventListener('click',()=>showTab(a.dataset.target)));
+      document.getElementById('userModal').addEventListener('show.bs.modal',()=>{
+        document.getElementById('uuidField').value=crypto.randomUUID();
+      });
+      document.getElementById('userForm').addEventListener('submit',async e=>{
+        e.preventDefault();
+        const fd=new FormData(e.target);
+        const req=['username','email','role','fullname','password'];
+        if(fd.get('role')==='öğrenci') req.push('st_class');
+        if(req.some(k=>!fd.get(k)?.trim())){alert('Tüm alanları doldurun!');return;}
+        const js=await (await fetch("{% url 'add_user' %}",{
+          method:'POST',credentials:'same-origin',
+          headers:{'X-CSRFToken':csrfToken},body:fd
+        })).json();
+        if(!js.ok){alert(js.msg||'Sunucu hatası');return;}
+        bootstrap.Modal.getInstance(document.getElementById('userModal')).hide();
+        loadUsers();
+      });
+      document.getElementById('courseModal').addEventListener('show.bs.modal',loadManagers);
+      document.getElementById('courseForm').addEventListener('submit',async e=>{
+        e.preventDefault();
+        const fd=new FormData(e.target);
+        if([...fd.values()].some(v=>!v.trim())){alert('Boş alan bırakma!');return;}
+        const js=await (await fetch("{% url 'add_course' %}",{
+          method:'POST',credentials:'same-origin',
+          headers:{'X-CSRFToken':csrfToken},body:fd
+        })).json();
+        if(!js.ok){alert(js.msg||'Sunucu hatası');return;}
+        bootstrap.Modal.getInstance(document.getElementById('courseModal')).hide();
+        loadCourses();
+      });
+      document.getElementById('classroomForm').addEventListener('submit',async e=>{
+        e.preventDefault();
+        const fd=new FormData(e.target);
+        if([...fd.values()].some(v=>!v.trim())){alert('Boş alan bırakma!');return;}
+        const js=await (await fetch("{% url 'add_classroom' %}",{
+          method:'POST',credentials:'same-origin',
+          headers:{'X-CSRFToken':csrfToken},body:fd
+        })).json();
+        if(!js.ok){alert(js.msg||'Sunucu hatası');return;}
+        bootstrap.Modal.getInstance(document.getElementById('classroomModal')).hide();
+        loadClassrooms();
+      });
+      document.getElementById('createScheduleBtn').addEventListener('click',async ()=>{
+        const sid=document.getElementById('scheduleID').value.trim();
+        if(!sid){alert('Lütfen bir Program ID girin!');return;}
+        const js=await (await fetch(apiCreate,{
+          method:'POST',credentials:'same-origin',
+          headers:{'X-CSRFToken':csrfToken,'Content-Type':'application/json'},
+          body:JSON.stringify({schedule_id:sid})
+        })).json();
+        if(js.status!=='success'){alert(js.message||'Program oluşturulamadı');return;}
+        loadSchedules();
+      });
+
+      // load initial data
+      loadUsers();
+      loadCourses();
+      loadClassrooms();
+      loadSchedules();
+    });
+  </script>
+</body>
+</html>
